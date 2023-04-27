@@ -27,12 +27,64 @@ type EmailsDeleteRequest struct {
 	DeleteEmailsIDs []string `json:"deleteEmailsIds"`
 }
 
+const viewerHTML = `
+<script type="module">
+  import { createApp } from 'https://unpkg.com/petite-vue?module'
+  
+  createApp({
+    emails: [],
+	lastRefreshed: null,
+	lastUpdated: null,
+	paused: false,
+
+	mounted() {
+		this.getEmails();
+
+		setInterval(() => {
+			if (!this.paused) {
+				this.getEmails();
+			}
+		}, 3000); 	
+	},
+
+	// methods
+	getEmails() {
+		fetch('%s/emails')
+			.then((res) => res.json())
+			.then((res) => {
+				this.emails = res.emails;
+				this.lastRefreshed = Date.now();
+				this.lastUpdated = res.lastUpdatedAtUTC;
+			}).catch((err) => console.warn('Something went wrong.', err));
+	}
+  }).mount()
+</script>
+
+<div v-scope @vue:mounted="mounted">
+  <p>{{lastRefreshed}} {{lastUpdated}}</p>
+  <button @click="paused = !paused">{{paused ? "unpause" : "pause"}} refresh</button>
+  <div class="email" v-for="email in emails">
+  	<h2>{{ email.subject }}</h2>
+	<h2>{{ email.from }}</h2>
+	<p>{{ email.body }}</p>
+  </div>
+</div>
+
+<style>
+.email {
+	background-color: grey;
+	margin: 5px;
+	padding: 5px;
+}
+</style>
+`
+
 func (m *MockEmailSender) EmailViewer(pathPrefix string) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		urlPath := strings.TrimPrefix(req.URL.Path, pathPrefix)
 
 		if urlPath == "/" || urlPath == "" {
-			io.WriteString(res, "Hello world")
+			io.WriteString(res, fmt.Sprintf(viewerHTML, pathPrefix))
 			return
 		}
 

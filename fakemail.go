@@ -1,13 +1,13 @@
 package fakemail
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
 
 type MockEmailSender struct {
 	// TODO add slog support
-
 	emails        map[string]MockEmail
 	lock          *sync.RWMutex
 	lastUpdatedAt time.Time
@@ -24,10 +24,22 @@ func NewMockSender() *MockEmailSender {
 type MockEmail struct {
 	From string   `json:"from"`
 	To   []string `json:"to"`
-	Body string   `json:"body"`
+
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
 
 	Metadata map[string]string `json:"metadata"`
 }
 
-// Send(to []string, tplName TplID, tplVars map[string]interface{}) error
-// BulkSend(templateID TplID, messages []PreparedEmail) error
+func (m *MockEmailSender) Send(emails ...MockEmail) []string {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	ids := []string{}
+	for _, email := range emails {
+		id := fmt.Sprintf("%d", time.Now().UTC().UnixNano())
+		m.emails[id] = email
+	}
+
+	return ids
+}
