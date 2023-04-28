@@ -128,6 +128,7 @@
 
         <div class="main">
             <div class="list m-2">
+                <h1 class="m-2 text-2xl font-medium" v-if="Object.entries(emails).length > 0">{{ Object.entries(emails).length }} Emails Sent</h1>
                 <div v-bind:class="selected === id ? 'bg-blue-500 text-white drop-shadow-md' : ''" class="rounded-md bg-white hover:drop-shadow-md text-black m-1 p-2 mb-2 w-80 flex justify-between"
                     v-for="(email, id, index) in emails" @click="selected = id">
                     <div>
