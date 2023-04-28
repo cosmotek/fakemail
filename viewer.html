@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>FakeMail Email Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+
+<body>
+    <script>
+        function adjustFrameHeight(iframe, body) {
+            var contentWindow = iframe.contentWindow;
+            var height = contentWindow.outerHeight
+                ? contentWindow.outerHeight
+                : contentWindow.screen.availHeight;
+            iframe.style.height = height + "px";
+            iframe.open();
+            iframe.write(body);
+            iframe.close();
+        }
+    </script>
+
+    <script type="module">
+        import { createApp } from 'https://unpkg.com/petite-vue?module';
+
+        createApp({
+            emails: {},
+            lastRefreshed: null,
+            lastUpdated: null,
+            selected: null,
+            paused: false,
+
+            mounted() {
+                this.getEmails();
+
+                setInterval(() => {
+                    if (!this.paused) {
+                        this.getEmails();
+                    }
+                }, 3000);
+            },
+
+            // methods
+            purgeEmails() {
+                fetch('%s/emails', {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 'deleteAllEmails': true }),
+                }).catch((err) => console.warn('Something went wrong.', err));
+
+                this.selected = null;
+                this.getEmails();
+            },
+            deleteEmail(id) {
+                fetch('%s/emails', {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 'deleteEmailsIds': [id] }),
+                }).catch((err) => console.warn('Something went wrong.', err));
+
+                this.getEmails();
+            },
+            getEmails() {
+                fetch('%s/emails')
+                    .then((res) => res.json())
+                    .then((res) => {
+                        this.emails = res.emails;
+                        this.lastRefreshed = Date.now();
+                        this.lastUpdated = res.lastUpdatedAtUTC;
+
+                        if (!this.selected) {
+                            var values = Object.keys(this.emails);
+                            if (values.length > 0) {
+                                this.selected = values[0];
+                            }
+                        }
+                    }).catch((err) => console.warn('Something went wrong.', err));
+            },
+            htmlToText(html) {
+                var temp = document.createElement('div');
+                temp.innerHTML = html;
+                return temp.textContent; // Or return temp.innerText if you need to return only visible text. It's slower.
+            },
+            getSelected(id) {
+                return this.emails[id];
+            },
+        }).mount()
+    </script>
+
+    <div id="app" v-scope @vue:mounted="mounted">
+        <nav class="bg-gray-800">
+            <div class="mx-auto max-w-8xl px-4 sm:px-6 lg:px-4">
+                <div class="relative flex h-16 items-center justify-between">
+                    <div class="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
+                        <div class="flex flex-shrink-0 items-center">
+                            <h1 class="text-white text-2xl font-bold">Fake<span class="text-blue-500">Mail</span></h1>
+                        </div>
+                    </div>
+                    <div
+                        class="absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
+                        <div class="hidden sm:ml-6 sm:block">
+                            <div class="flex space-x-4">
+                                <p class="bg-blue-400 hover:bg-blue-500 text-white rounded-md px-3 py-2 text-sm font-medium"
+                                    aria-current="page">Send Email</p>
+                                <p @click="purgeEmails"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-3 py-2 text-sm font-medium">
+                                    Delete
+                                    All</p>
+                                <p @click="paused = !paused"
+                                    class="bg-blue-800 hover:bg-blue-900 text-white rounded-md px-3 py-2 text-sm font-medium">
+                                    {{paused ? "Unpause" : "Pause"}} Autorefresh</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="main">
+            <div class="list m-2">
+                <div v-bind:class="selected === id ? 'bg-blue-500 text-white drop-shadow-md' : ''" class="rounded-md bg-white hover:drop-shadow-md text-black m-1 p-2 mb-2 w-80 flex justify-between"
+                    v-for="(email, id, index) in emails" @click="selected = id">
+                    <div>
+                        <h2 class="text-lg font-medium">{{ email.subject }}</h2>
+                        <h2 class="text-md font-medium text-gray-500">{{ email.from }}</h2>
+                        <p>{{ htmlToText(email.body) }}</p>
+                    </div>
+                    <div class="fill-rose-600 rounded-lg p-3 bg-white w-6 h-6 flex justify-center align-center"
+                        @click="deleteEmail(id)">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <div class="m-3">
+                <div v-if="selected">
+                    <h2 class="text-2xl font-medium">{{ getSelected(selected).subject }}</h2>
+                    <h2 class="text-md font-medium text-gray-400">From {{ getSelected(selected).from }} to {{ getSelected(selected).to.join(', ') }}</h2>
+                </div>
+                <div v-if="selected" class="rounded-md border border-gray-200 w-fit p-2 mt-2">
+                    <h2 class="text-md font-bold">HTML Body</h2>
+                    <p class="email-detail-body">
+                        <iframe v-bind:onload="adjustFrameHeight(this, getSelected(selected).body)" src="about:blank"></iframe>
+                    </p>
+    
+                    <h2 class="text-md font-bold">Text Body</h2>
+                    <div>{{ htmlToText(getSelected(selected).body) }}</div>
+                </div>
+            </div>
+
+            <div v-if="!selected" class="flex justify-center align-center h-max w-max p-5">
+                <h1>No emails sent.</h1>
+            </div>
+        </div>
+
+        <p class="text-gray-300 block rounded-md px-3 py-2 text-base font-medium">
+            Last updated at {{lastUpdated}}, Last refreshed {{Date.now() - lastRefreshed}} secs ago</p>
+    </div>
+
+    <style>
+        .list {
+            height: 84vh;
+            overflow-y: scroll;
+        }
+
+        .email,
+        .selected {
+            background-color: #99f6e4;
+        }
+
+        .email {
+            background-color: #ccfbf1;
+            margin: 5px;
+            padding: 5px;
+            flex: 1;
+        }
+
+        .email-viewer {
+            flex: 2;
+        }
+
+        .main {
+            display: flex;
+        }
+    </style>
+</body>
+
+</html>
